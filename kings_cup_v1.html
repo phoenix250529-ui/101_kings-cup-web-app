@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>キングスカップ (King's Cup)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #121214;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 100vh;
+            padding: 20px;
+            text-align: center;
+        }
+        header {
+            margin-top: 10px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 26px;
+            color: #e9c46a;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+        .stats {
+            font-size: 14px;
+            color: #a0a0a5;
+            background-color: #1a1a1e;
+            padding: 6px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            border: 1px solid #2a2a30;
+        }
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 400px;
+            margin: 15px 0;
+        }
+        
+        /* divからbuttonに変更したためのリセット設定 */
+        button.card-area {
+            -webkit-appearance: none;
+            appearance: none;
+            border: none;
+            outline: none;
+            font-family: inherit;
+            -webkit-tap-highlight-color: transparent; /* タップ時の青い影を消す */
+        }
+        
+        .card-area {
+            width: 220px;
+            height: 300px;
+            background-color: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            position: relative;
+        }
+        .card-area:active {
+            transform: scale(0.96);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .card-corner {
+            font-size: 26px;
+            font-weight: bold;
+            line-height: 1;
+            text-align: left;
+        }
+        .card-corner.bottom {
+            transform: rotate(180deg);
+        }
+        .card-center {
+            font-size: 84px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .red { color: #e76f51; }
+        .black { color: #264653; }
+        .default-view { color: #e9c46a; }
+        
+        .rule-container {
+            margin-top: 25px;
+            min-height: 140px;
+            width: 100%;
+            background-color: #1a1a1e;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #2a2a30;
+        }
+        .rule-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #e9c46a;
+            margin-bottom: 10px;
+        }
+        .rule-desc {
+            font-size: 15px;
+            color: #d1d1d6;
+            line-height: 1.6;
+        }
+        
+        .settings-panel {
+            width: 100%;
+            max-width: 400px;
+            background-color: #1a1a1e;
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #2a2a30;
+        }
+        .settings-title {
+            font-size: 13px;
+            color: #a0a0a5;
+            margin-bottom: 8px;
+            font-weight: bold;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #3a3a42;
+            background-color: #26262b;
+            color: #fff;
+            font-size: 14px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #e9c46a;
+        }
+        button {
+            padding: 10px 16px;
+            background-color: #e9c46a;
+            color: #121214;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        button:active { background-color: #ddb756; }
+        
+        .btn-rules {
+            background-color: #264653;
+            color: white;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .btn-rules:active { background-color: #1d3540; }
+        .btn-reset {
+            background-color: #e76f51;
+            color: white;
+            width: 100%;
+        }
+        .btn-reset:active { background-color: #d65d41; }
+
+        /* モーダル（ポップアップ）のスタイル */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal.show {
+            display: flex; /* class追加で表示される */
+        }
+        .modal-content {
+            background-color: #1a1a1e;
+            padding: 20px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            border: 1px solid #2a2a30;
+            text-align: left;
+        }
+        .close-btn {
+            color: #a0a0a5;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-btn:hover { color: #e9c46a; }
+        .modal-title {
+            color: #e9c46a;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 1px solid #3a3a42;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .rule-list-item {
+            margin-bottom: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #d1d1d6;
+        }
+        .rule-list-item strong {
+            color: #e76f51;
+            font-size: 16px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>King's Cup</h1>
+        <div class="stats" id="deck-stats">残りカード: 52枚 (Kの残り: 4枚)</div>
+    </header>
+
+    <div class="game-container">
+        <!-- スマホのタップを確実に検知するため div から button に変更 -->
+        <button class="card-area default-view" id="card-btn">
+            <div class="card-corner top" id="card-top">♣</div>
+            <div class="card-center" id="card-center">👑</div>
+            <div class="card-corner bottom" id="card-bottom">♣</div>
+        </button>
+
+        <div class="rule-container">
+            <div class="rule-title" id="rule-title">タップしてスタート</div>
+            <div class="rule-desc" id="rule-desc">カードをタップすると、シャッフルされた山札から1枚引かれます。</div>
+        </div>
+    </div>
+
+    <div class="settings-panel">
+        <button class="btn-rules" id="show-rules-btn">📋 ルール一覧を表示</button>
+        
+        <div class="settings-title">⚙ 10のルールカスタマイズ</div>
+        <div class="input-group">
+            <input type="text" id="rule10-input" value="Category - 引いた人がお題(例：都道府県)を決め、思いついたらすぐに言っていく。最後まで出なかった人が飲む！">
+            <button id="save-rule10-btn">保存</button>
+        </div>
+        <button class="btn-reset" id="reset-btn">ゲームをリセット</button>
+    </div>
+
+    <!-- ルール一覧用のモーダル（ポップアップ） -->
+    <div id="rules-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="close-modal-btn">&times;</span>
+            <div class="modal-title">現在のルール一覧</div>
+            <div id="rules-list-container">
+                <!-- JavaScriptでここにリストが生成されます -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultRules = {
+            'A': { title: 'Waterfall', desc: '引いた人から時計回りに順番に飲み始めます。引いた人が飲むのをやめるまで続けます。' },
+            '2': { title: 'You', desc: '指名した1人に飲ませます。' },
+            '3': { title: 'Me', desc: '引いた本人が飲みます。' },
+            '4': { title: 'Floor', desc: '全員、素早く床（またはテーブル）をタッチします。一番遅かった人が飲みます。' },
+            '5': { title: 'Guys', desc: '男性全員が飲みます。' },
+            '6': { title: 'Chicks', desc: '女性全員が飲みます。' },
+            '7': { title: 'Heaven', desc: '全員、素早く天井（上）を指さします。一番遅かった人が飲みます。' },
+            '8': { title: 'Mate', desc: '誰か1人を「相棒」に指名します。次に 8(Mate) が引かれるまで、相棒も必ず連帯責任で飲みます。' },
+            '9': { title: 'Scapegoat', desc: '誰か1人を「身代わり」に指名します。次に 9(Scapegoat) が引かれるまで、身代わりの人はその人の代わりに飲みます。' },
+            '10': { title: '10の役', desc: '' },
+            'J': { title: 'Rule', desc: '次に J(Rule) が引かれるまでの新しいルールを1つ作れます。以降、破った人はペナルティとして飲みます。' },
+            'Q': { title: 'Question', desc: '次に Q(Question) が引かれるまで、引いた人からの質問にうっかり答えた人が飲みます。' },
+            'K': { title: "King's Cup (キングスカップ)", desc: '1〜3枚目のKを引いた人は、好きなの飲み物を中央のカップに注ぎます。最後の4枚目のKを引いた人は、そのカップをすべて飲み干してゲーム終了です。' }
+        };
+
+        let customRule10 = "Category - 引いた人がお題(例：都道府県)を決め、思いついたらすぐに言っていく。最後まで出なかった人が飲む！";
+
+        const suits = [
+            { symbol: '♠', color: 'black' },
+            { symbol: '♥', color: 'red' },
+            { symbol: '♦', color: 'red' },
+            { symbol: '♣', color: 'black' }
+        ];
+        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+        let deck = [];
+        let kingsLeft = 4;
+
+        function initDeck() {
+            deck = [];
+            kingsLeft = 4;
+            for (let suit of suits) {
+                for (let val of values) {
+                    deck.push({ suit: suit, value: val });
+                }
+            }
+            shuffle(deck);
+            updateStats();
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('deck-stats').textContent = `残りカード: ${deck.length}枚 (Kの残り: ${kingsLeft}枚)`;
+        }
+
+        function drawCard() {
+            if (deck.length === 0) {
+                alert('すべてのカードを引き切りました！ゲームをリセットします。');
+                initDeck();
+                resetCardUI();
+                return;
+            }
+
+            const card = deck.pop();
+            
+            if (card.value === 'K') {
+                kingsLeft--;
+            }
+            updateStats();
+
+            const cardBtn = document.getElementById('card-btn');
+            const cardTop = document.getElementById('card-top');
+            const cardCenter = document.getElementById('card-center');
+            const cardBottom = document.getElementById('card-bottom');
+
+            cardBtn.style.backgroundColor = '#ffffff';
+            cardBtn.className = `card-area ${card.suit.color}`;
+            cardTop.textContent = card.suit.symbol + card.value;
+            cardCenter.textContent = card.value;
+            cardBottom.textContent = card.suit.symbol + card.value;
+
+            const ruleTitle = document.getElementById('rule-title');
+            const ruleDesc = document.getElementById('rule-desc');
+
+            let rule = defaultRules[card.value];
+            
+            if (card.value === '10') {
+                ruleTitle.textContent = "10: カスタムルール";
+                ruleDesc.textContent = customRule10;
+            } else if (card.value === 'K' && kingsLeft === 0) {
+                ruleTitle.textContent = `最後のK: ${rule.title} 💀`;
+                ruleDesc.textContent = `4枚目のKが引かれました！中央のキングスカップをすべて飲み干してください！ゲーム終了です！`;
+            } else {
+                ruleTitle.textContent = `${card.value}: ${rule.title}`;
+                ruleDesc.textContent = rule.desc;
+            }
+        }
+
+        function resetCardUI() {
+            const cardBtn = document.getElementById('card-btn');
+            document.getElementById('card-top').textContent = '♣';
+            document.getElementById('card-center').textContent = '👑';
+            document.getElementById('card-bottom').textContent = '♣';
+            cardBtn.style.backgroundColor = '';
+            cardBtn.className = 'card-area default-view';
+            document.getElementById('rule-title').textContent = 'タップしてスタート';
+            document.getElementById('rule-desc').textContent = 'カードをタップすると、シャッフルされた山札から1枚引かれます。';
+        }
+
+        // ▼▼ モーダル（ルール一覧）の制御 ▼▼
+        const rulesModal = document.getElementById('rules-modal');
+        const showRulesBtn = document.getElementById('show-rules-btn');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const rulesListContainer = document.getElementById('rules-list-container');
+
+        function renderRulesList() {
+            rulesListContainer.innerHTML = ''; 
+            const displayOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+            
+            displayOrder.forEach(val => {
+                let rule = defaultRules[val];
+                let desc = rule.desc;
+                let title = rule.title;
+                
+                if (val === '10') {
+                    title = 'カスタムルール';
+                    desc = customRule10;
+                }
+                
+                const li = document.createElement('div');
+                li.className = 'rule-list-item';
+                li.innerHTML = `<strong>${val}</strong> [${title}]<br>${desc}`;
+                rulesListContainer.appendChild(li);
+            });
+        }
+
+        showRulesBtn.addEventListener('click', () => {
+            renderRulesList(); // モーダルを開くたびに最新の情報を構築
+            rulesModal.classList.add('show');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            rulesModal.classList.remove('show');
+        });
+
+        // モーダルの黒い背景部分をタップしても閉じるようにする
+        rulesModal.addEventListener('click', (e) => {
+            if(e.target === rulesModal) {
+                rulesModal.classList.remove('show');
+            }
+        });
+        // ▲▲ モーダルの制御ここまで ▲▲
+
+        // イベントリスナーの登録
+        document.getElementById('card-btn').addEventListener('click', drawCard);
+
+        document.getElementById('save-rule10-btn').addEventListener('click', () => {
+            const inputVal = document.getElementById('rule10-input').value;
+            if (inputVal.trim() !== "") {
+                customRule10 = inputVal;
+                alert('10のルールを更新しました！\n（ルール一覧にも反映されています）');
+            }
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            if (confirm('ゲームを最初からやり直しますか？')) {
+                initDeck();
+                resetCardUI();
+            }
+        });
+
+        // アプリ起動時に初期化
+        initDeck();
+    </script>
+</body>
+</html>
