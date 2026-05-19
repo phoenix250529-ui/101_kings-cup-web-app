@@ -12,7 +12,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
             min-height: 100vh; padding: 20px; text-align: center;
         }
-        header { margin-top: 10px; width: 100%; margin-bottom: 20px; }
+        header { margin-top: 10px; width: 100%; margin-bottom: 15px; }
         h1 { font-size: 26px; color: #e9c46a; margin-bottom: 5px; letter-spacing: 1px; }
         .stats { font-size: 14px; color: #a0a0a5; background-color: #1a1a1e; padding: 6px 15px; border-radius: 20px; display: inline-block; border: 1px solid #2a2a30; }
         
@@ -22,15 +22,12 @@
         #game-view { display: none; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         .room-info { color: #a0a0a5; font-size: 14px; margin-bottom: 10px; }
 
-        /* ▼▼ 追加：特殊状態（8, 9, J）を表示するパネルのスタイル ▼▼ */
-        .special-states {
-            width: 100%; background-color: #1a1a1e; border-radius: 12px; padding: 12px 15px;
-            border: 1px solid #2a2a30; margin-bottom: 15px; text-align: left;
-        }
-        .state-item { font-size: 14px; color: #d1d1d6; margin-bottom: 6px; }
-        .state-item strong { color: #e9c46a; margin-right: 5px; }
-        .rules-item ul { margin-top: 4px; padding-left: 20px; font-size: 13px; color: #a0a0a5; }
-        /* ▲▲ 追加ここまで ▲▲ */
+        /* 特殊状態パネル */
+        .special-states { width: 100%; background-color: #1a1a1e; border-radius: 12px; padding: 12px 15px; border: 1px solid #2a2a30; margin-bottom: 15px; text-align: left; }
+        .state-title { font-size: 14px; color: #e9c46a; font-weight: bold; margin-bottom: 5px; margin-top: 10px; }
+        .state-title:first-child { margin-top: 0; }
+        .state-list { padding-left: 20px; font-size: 13px; color: #d1d1d6; margin-bottom: 5px; }
+        .state-list li { margin-bottom: 3px; }
 
         .game-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; margin: 10px 0; }
         button.card-area { -webkit-appearance: none; appearance: none; border: none; outline: none; font-family: inherit; -webkit-tap-highlight-color: transparent; }
@@ -89,14 +86,15 @@
         <div class="room-info" id="current-room-display">部屋ID: 取得中...</div>
         <div class="stats" id="deck-stats">残りカード: --枚 (Kの残り: -枚)</div>
 
-        <!-- ▼▼ 追加：特殊状態を常に表示するエリア ▼▼ -->
         <div id="special-states-container" class="special-states">
-            <div class="state-item"><strong>👥 Mate (相棒):</strong> <span id="mate-display-text">なし</span></div>
-            <div class="state-item"><strong>🛡 Scapegoat (身代わり):</strong> <span id="scapegoat-display-text">なし</span></div>
-            <div class="state-item rules-item">
-                <strong>📜 追加ルール (J):</strong>
-                <ul id="added-rules-list"><li>なし</li></ul>
-            </div>
+            <div class="state-title">👥 Mate (相棒)</div>
+            <ul class="state-list" id="mate-list"><li>なし</li></ul>
+            
+            <div class="state-title">🛡 Scapegoat (身代わり)</div>
+            <ul class="state-list" id="scapegoat-list"><li>なし</li></ul>
+            
+            <div class="state-title">📜 追加ルール (J)</div>
+            <ul class="state-list" id="added-rules-list"><li>なし</li></ul>
         </div>
 
         <div class="game-container">
@@ -133,7 +131,6 @@
     </div>
 
     <script type="module">
-        // ▼▼ 変更: onDisconnect（自動削除機能）を追加でインポート ▼▼
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
         import { getDatabase, ref, get, set, onValue, update, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 
@@ -154,14 +151,16 @@
 
         let currentRoomId = null;
         let roomRef = null;
-        let isHost = false; // 自分が部屋を作った人かどうか
+        let myPresenceRef = null;
+        // ユーザー固有のランダムIDを生成
+        const myUserId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-        // 状態変数
         let deck = [];
         let kingsLeft = 4;
         let customRule10 = "Category - 引いた人がお題(例：都道府県)を決め、思いついたらすぐに言っていく。最後まで出なかった人が飲む！";
-        let mate = "なし";
-        let scapegoat = "なし";
+        
+        let mateList = [];
+        let scapegoatList = [];
         let addedRules = [];
         
         const defaultRules = {
@@ -175,7 +174,7 @@
             '8': { title: 'Mate', desc: '誰か1人を「相棒」に指名します。次に 8(Mate) が引かれるまで、相棒も必ず連帯責任で飲みます。' },
             '9': { title: 'Scapegoat', desc: '誰か1人を「身代わり」に指名します。次に 9(Scapegoat) が引かれるまで、身代わりの人はその人の代わりに飲みます。' },
             '10': { title: '10の役', desc: '' },
-            'J': { title: 'Rule', desc: '次に J(Rule) が引かれるまでの新しいルールを1つ作れます。以降、破った人はペナルティとして飲みます。' },
+            'J': { title: 'Rule', desc: '新しいルールを1つ追加します。以降、破った人はペナルティとして飲みます。' }, // 文言修正
             'Q': { title: 'Question', desc: '次に Q(Question) が引かれるまで、引いた人からの質問にうっかり答えた人が飲みます。' },
             'K': { title: "King's Cup", desc: '1〜3枚目のKを引いた人は、好きな飲み物を中央のカップに注ぎます。最後の4枚目のKを引いた人は、それをすべて飲み干してゲーム終了です。' }
         };
@@ -205,72 +204,85 @@
             return shuffle(newDeck);
         }
 
-        // ▼▼ 部屋への入室処理 ▼▼
         document.getElementById('join-room-btn').addEventListener('click', async () => {
             const inputId = document.getElementById('room-id-input').value.trim();
             if (!inputId) { alert("部屋IDを入力してください"); return; }
             
             currentRoomId = inputId;
             roomRef = ref(db, `rooms/${currentRoomId}`);
+            myPresenceRef = ref(db, `rooms/${currentRoomId}/users/${myUserId}`);
 
             try {
                 const snapshot = await get(roomRef);
+                let isGhostRoom = false;
+
+                // 部屋が存在しない、または参加者(users)が0人の場合は初期化（ゴーストルーム対策）
                 if (!snapshot.exists()) {
-                    // 自分が最初の作成者（ホスト）になる
-                    isHost = true;
+                    isGhostRoom = true;
+                } else {
+                    const data = snapshot.val();
+                    if (!data.users) {
+                        isGhostRoom = true;
+                    }
+                }
+
+                if (isGhostRoom) {
                     await set(roomRef, {
                         deck: generateNewDeck(),
                         kingsLeft: 4,
                         currentCard: null,
                         customRule10: customRule10,
-                        mate: "なし",
-                        scapegoat: "なし",
+                        mateList: [],
+                        scapegoatList: [],
                         addedRules: []
                     });
-                    
-                    // ▼▼ 追加：ステップ4 (自動削除機能) ▼▼
-                    // ホストがブラウザを閉じたり通信が切れたら、自動でこの部屋のデータを削除する
-                    onDisconnect(roomRef).remove();
                 }
+                
+                // 自分の参加状態を記録し、切断時（ブラウザ閉じ等）に自動で消去するよう予約
+                await set(myPresenceRef, true);
+                onDisconnect(myPresenceRef).remove();
+
             } catch(e) {
                 console.error("Firebaseアクセスエラー:", e);
-                alert("データベースにアクセスできませんでした。Firebaseの設定URLや環境を確認してください。");
+                alert("データベースにアクセスできませんでした。");
                 return;
             }
 
             document.getElementById('lobby-container').style.display = 'none';
             document.getElementById('game-view').style.display = 'flex';
-            document.getElementById('current-room-display').textContent = `部屋ID: ${currentRoomId} ${isHost ? '(あなたがホストです)' : ''}`;
+            document.getElementById('current-room-display').textContent = `部屋ID: ${currentRoomId}`;
 
-            // Firebaseのデータ変更をリアルタイム監視
             onValue(roomRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
                     deck = data.deck || [];
                     kingsLeft = data.kingsLeft !== undefined ? data.kingsLeft : 4;
                     customRule10 = data.customRule10 || customRule10;
-                    mate = data.mate || "なし";
-                    scapegoat = data.scapegoat || "なし";
+                    mateList = data.mateList || [];
+                    scapegoatList = data.scapegoatList || [];
                     addedRules = data.addedRules || [];
                     
                     document.getElementById('rule10-input').value = customRule10;
                     document.getElementById('deck-stats').textContent = `残りカード: ${deck.length}枚 (Kの残り: ${kingsLeft}枚)`;
                     
-                    // ▼▼ 追加：ステップ3 (特殊状態のUI更新) ▼▼
-                    document.getElementById('mate-display-text').textContent = mate;
-                    document.getElementById('scapegoat-display-text').textContent = scapegoat;
-                    
-                    const rulesList = document.getElementById('added-rules-list');
-                    rulesList.innerHTML = '';
-                    if (addedRules.length === 0) {
-                        rulesList.innerHTML = '<li>なし</li>';
-                    } else {
-                        addedRules.forEach(r => {
-                            const li = document.createElement('li');
-                            li.textContent = r;
-                            rulesList.appendChild(li);
-                        });
-                    }
+                    // リストUIの更新関数
+                    const updateListUI = (elementId, listData) => {
+                        const el = document.getElementById(elementId);
+                        el.innerHTML = '';
+                        if (listData.length === 0) {
+                            el.innerHTML = '<li>なし</li>';
+                        } else {
+                            listData.forEach(text => {
+                                const li = document.createElement('li');
+                                li.textContent = text;
+                                el.appendChild(li);
+                            });
+                        }
+                    };
+
+                    updateListUI('mate-list', mateList);
+                    updateListUI('scapegoat-list', scapegoatList);
+                    updateListUI('added-rules-list', addedRules);
                     
                     if (data.currentCard) {
                         updateCardUI(data.currentCard);
@@ -278,16 +290,14 @@
                         resetCardUI();
                     }
                 } else {
-                    // 部屋データが削除された場合（ホストが切断した、またはリセットされた場合）
                     if(currentRoomId) {
-                        alert("部屋が解散されたか、ホストが退室しました。\nロビーに戻ります。");
+                        alert("部屋が解散されました。\nロビーに戻ります。");
                         location.reload();
                     }
                 }
             });
         });
 
-        // ▼▼ カードを引く処理 ▼▼
         document.getElementById('card-btn').addEventListener('click', async () => {
             if (!currentRoomId) return;
             if (deck.length === 0) {
@@ -299,36 +309,46 @@
             let newKingsLeft = kingsLeft;
             if (card.value === 'K') newKingsLeft--;
 
-            // 1. まず「カード情報」だけを先にFirebaseに更新する（これで全員の画面が切り替わる）
             await update(roomRef, {
                 deck: deck,
                 kingsLeft: newKingsLeft,
                 currentCard: card
             });
 
-            // 2. その0.1秒後に、引いた本人の画面にだけポップアップを出す（ステップ3）
+            // 2段階ポップアップ機能
             setTimeout(async () => {
                 let stateChanged = false;
-                let newMate = mate;
-                let newScapegoat = scapegoat;
+                let newMateList = [...mateList];
+                let newScapegoatList = [...scapegoatList];
                 let newAddedRules = [...addedRules];
 
                 if (card.value === '8') {
-                    const input = prompt("【Mate (相棒)】\n相棒に指名する人の名前を入力してください：");
-                    if (input) { newMate = input; stateChanged = true; }
+                    const p1 = prompt("【Mate (相棒)】\nまず、カードを引いた人（あなた）の名前を入力してください：");
+                    if (p1) { 
+                        const p2 = prompt(`【Mate (相棒)】\n次に、${p1}さんの「相棒」になる人の名前を入力してください：`);
+                        if (p2) {
+                            newMateList.push(`${p1} 🤝 ${p2}`);
+                            stateChanged = true;
+                        }
+                    }
                 } else if (card.value === '9') {
-                    const input = prompt("【Scapegoat (身代わり)】\n身代わりに指名する人の名前を入力してください：");
-                    if (input) { newScapegoat = input; stateChanged = true; }
+                    const p1 = prompt("【Scapegoat (身代わり)】\nまず、カードを引いた人（あなた）の名前を入力してください：");
+                    if (p1) { 
+                        const p2 = prompt(`【Scapegoat (身代わり)】\n次に、${p1}さんの「身代わり」になる人の名前を入力してください：`);
+                        if (p2) {
+                            newScapegoatList.push(`${p1} 🛡️ ${p2}`);
+                            stateChanged = true;
+                        }
+                    }
                 } else if (card.value === 'J') {
                     const input = prompt("【Rule (ルール追加)】\n追加する新しいルールを入力してください：");
                     if (input) { newAddedRules.push(input); stateChanged = true; }
                 }
 
-                // 3. 入力があった場合のみ、追加情報としてFirebaseを更新する
                 if (stateChanged) {
                     await update(roomRef, {
-                        mate: newMate,
-                        scapegoat: newScapegoat,
+                        mateList: newMateList,
+                        scapegoatList: newScapegoatList,
                         addedRules: newAddedRules
                     });
                 }
@@ -380,30 +400,29 @@
 
         document.getElementById('reset-btn').addEventListener('click', async () => {
             if (confirm('この部屋のゲーム状態をリセットしますか？\n（デッキと追加ルールがすべて初期化されます）')) {
-                await set(roomRef, {
+                // updateを使うことで、参加者(users)のデータを消さずにリセットする
+                await update(roomRef, {
                     deck: generateNewDeck(),
                     kingsLeft: 4,
                     currentCard: null,
                     customRule10: customRule10,
-                    mate: "なし",
-                    scapegoat: "なし",
+                    mateList: [],
+                    scapegoatList: [],
                     addedRules: []
                 });
             }
         });
 
         document.getElementById('leave-room-btn').addEventListener('click', async () => {
-            const msg = isHost ? '退室しますか？\n※あなたはホストのため、退室するとこの部屋のゲームは解散（削除）されます。' : '退室してロビーに戻りますか？';
-            if (confirm(msg)) {
-                // ホストが退室ボタンを押した場合は、即座に部屋のデータを削除する
-                if (isHost && roomRef) {
-                    await remove(roomRef);
+            if (confirm('退室してロビーに戻りますか？')) {
+                // 自分の参加状態を即座に削除
+                if (myPresenceRef) {
+                    await remove(myPresenceRef);
                 }
                 location.reload(); 
             }
         });
 
-        // モーダル制御
         const rulesModal = document.getElementById('rules-modal');
         document.getElementById('show-rules-btn').addEventListener('click', () => {
             const container = document.getElementById('rules-list-container');
