@@ -27,7 +27,8 @@
         .lobby-title { font-size: 18px; color: #e9c46a; margin-bottom: 20px; }
         
         #game-view { display: none; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
-        .room-info { color: #a0a0a5; font-size: 14px; margin-bottom: 10px; }
+        .room-info { color: #a0a0a5; font-size: 14px; margin-bottom: 10px; line-height: 1.5; }
+        .active-users-list { color: #e9c46a; font-weight: bold; }
 
         .special-states { width: 100%; background-color: #1a1a1e; border-radius: 12px; padding: 12px 15px; border: 1px solid #2a2a30; margin-bottom: 15px; text-align: left; }
         .state-title { font-size: 14px; color: #e9c46a; font-weight: bold; margin-bottom: 5px; margin-top: 10px; }
@@ -63,7 +64,6 @@
         .btn-rules:active { background-color: #1d3540; }
         .btn-reset { background-color: #e76f51; color: white; width: 100%; }
         .btn-reset:active { background-color: #d65d41; }
-        
         .btn-delete { background-color: #3a3a42; color: #e76f51; width: 100%; margin-top: 10px; border: 1px solid #e76f51; }
         .btn-delete:active { background-color: #e76f51; color: white; }
 
@@ -75,6 +75,10 @@
         .modal-title { color: #e9c46a; margin-bottom: 15px; font-size: 20px; border-bottom: 1px solid #3a3a42; padding-bottom: 10px; text-align: center; }
         .rule-list-item { margin-bottom: 12px; font-size: 14px; line-height: 1.5; color: #d1d1d6; }
         .rule-list-item strong { color: #e76f51; font-size: 16px; margin-right: 5px; }
+        
+        /* プルダウンのスタイル */
+        select.custom-select { width: 100%; margin-bottom: 15px; padding: 12px; font-size: 16px; background-color: #26262b; color: #fff; border: 1px solid #3a3a42; border-radius: 6px; outline: none; }
+        select.custom-select:focus { border-color: #e9c46a; }
     </style>
 </head>
 <body>
@@ -84,17 +88,29 @@
     </header>
 
     <div id="lobby-container">
-        <div class="lobby-title">部屋IDを入力して参加</div>
+        <div class="lobby-title">部屋に参加する</div>
+        <!-- ▼▼ 追加：名前入力欄 ▼▼ -->
+        <div style="margin-bottom: 10px; font-size: 13px; color: #a0a0a5; text-align: left;">1. あなたの名前</div>
+        <div class="input-group" style="margin-bottom: 15px;">
+            <input type="text" id="user-name-input" placeholder="例: たろう">
+        </div>
+
+        <div style="margin-bottom: 10px; font-size: 13px; color: #a0a0a5; text-align: left;">2. 部屋ID</div>
         <div class="input-group">
             <input type="text" id="room-id-input" placeholder="例: nomikai123">
             <button id="join-room-btn">入室</button>
         </div>
         <p style="font-size:12px; color:#a0a0a5; margin-top:10px; text-align:left;">※同じ部屋IDを入力した人同士で同期されます。</p>
-        <button class="btn-delete" id="delete-room-btn">🗑️ 部屋のデータを強制削除</button>
+        <button class="btn-delete" id="delete-room-btn" style="margin-top: 25px;">🗑️ 部屋のデータを強制削除</button>
     </div>
 
     <div id="game-view" style="display: none;">
-        <div class="room-info" id="current-room-display">部屋ID: 取得中...</div>
+        <!-- ▼▼ 追加：現在の参加者リスト表示 ▼▼ -->
+        <div class="room-info" id="current-room-display">
+            部屋ID: 取得中...<br>
+            参加者: <span class="active-users-list" id="active-users-display">取得中...</span>
+        </div>
+        
         <div class="stats" id="deck-stats">残りカード: --枚</div>
         <div class="kings-left-badge" id="kings-left-display">👑 Kの残り: 4枚</div>
 
@@ -134,7 +150,7 @@
         </div>
     </div>
 
-    <!-- ルール一覧用モーダル -->
+    <!-- ルール一覧モーダル -->
     <div id="rules-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" id="close-modal-btn">&times;</span>
@@ -143,7 +159,7 @@
         </div>
     </div>
 
-    <!-- ▼▼ 追加：自作の入力ポップアップ（モーダル） ▼▼ -->
+    <!-- テキスト入力モーダル (J用) -->
     <div id="custom-prompt-modal" class="modal">
         <div class="modal-content" style="text-align: center;">
             <div class="modal-title" id="custom-prompt-title">タイトル</div>
@@ -152,6 +168,19 @@
             <div style="display:flex; gap:10px;">
                 <button id="custom-prompt-cancel" style="background-color:#3a3a42; color:#fff; flex:1;">スキップ</button>
                 <button id="custom-prompt-submit" style="flex:1;">確定</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ▼▼ 追加：プルダウン選択モーダル (8, 9用) ▼▼ -->
+    <div id="custom-select-modal" class="modal">
+        <div class="modal-content" style="text-align: center;">
+            <div class="modal-title" id="custom-select-title">タイトル</div>
+            <div style="color:#d1d1d6; font-size:14px; margin-bottom:15px;" id="custom-select-desc">説明文</div>
+            <select id="custom-select-input" class="custom-select"></select>
+            <div style="display:flex; gap:10px;">
+                <button id="custom-select-cancel" style="background-color:#3a3a42; color:#fff; flex:1;">スキップ</button>
+                <button id="custom-select-submit" style="flex:1;">確定</button>
             </div>
         </div>
     </div>
@@ -179,6 +208,9 @@
         let roomRef = null;
         let myPresenceRef = null;
         const myUserId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
+        let myName = ""; // ▼ 追加：自分の名前を保存する変数
+        let activeUsers = []; // ▼ 追加：現在オンラインのユーザーリスト
 
         let deck = [];
         let kingsLeft = 4;
@@ -229,7 +261,7 @@
             return shuffle(newDeck);
         }
 
-        // ▼▼ 追加：美しくてフリーズしないカスタム入力処理 ▼▼
+        // テキスト入力ポップアップ (J, 手入力用)
         function askQuestion(title, desc) {
             return new Promise((resolve) => {
                 const modal = document.getElementById('custom-prompt-modal');
@@ -238,14 +270,11 @@
                 const input = document.getElementById('custom-prompt-input');
                 input.value = '';
                 modal.classList.add('show');
-                
-                // スマホでもキーボードが出やすいように少し遅延してフォーカス
                 setTimeout(() => input.focus(), 100);
                 
                 const submitBtn = document.getElementById('custom-prompt-submit');
                 const cancelBtn = document.getElementById('custom-prompt-cancel');
                 
-                // イベントの多重登録を防ぐため、ボタンをクローンして置き換える
                 const newSubmit = submitBtn.cloneNode(true);
                 const newCancel = cancelBtn.cloneNode(true);
                 submitBtn.replaceWith(newSubmit);
@@ -253,21 +282,55 @@
                 
                 const cleanup = () => modal.classList.remove('show');
                 
-                newSubmit.addEventListener('click', () => {
-                    resolve(input.value.trim());
-                    cleanup();
-                });
-                newCancel.addEventListener('click', () => {
-                    resolve(null);
-                    cleanup();
-                });
+                newSubmit.addEventListener('click', () => { resolve(input.value.trim() || null); cleanup(); });
+                newCancel.addEventListener('click', () => { resolve(null); cleanup(); });
+            });
+        }
+
+        // ▼▼ 追加：プルダウン選択ポップアップ (8, 9用) ▼▼
+        function askSelectQuestion(title, desc, options) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-select-modal');
+                document.getElementById('custom-select-title').textContent = title;
+                document.getElementById('custom-select-desc').textContent = desc;
+                const select = document.getElementById('custom-select-input');
+                select.innerHTML = '';
+                
+                if (options.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = "";
+                    opt.textContent = "※他の参加者がいません";
+                    select.appendChild(opt);
+                } else {
+                    options.forEach(optVal => {
+                        const opt = document.createElement('option');
+                        opt.value = optVal.value;
+                        opt.textContent = optVal.text;
+                        select.appendChild(opt);
+                    });
+                }
+
+                modal.classList.add('show');
+                
+                const submitBtn = document.getElementById('custom-select-submit');
+                const cancelBtn = document.getElementById('custom-select-cancel');
+                
+                const newSubmit = submitBtn.cloneNode(true);
+                const newCancel = cancelBtn.cloneNode(true);
+                submitBtn.replaceWith(newSubmit);
+                cancelBtn.replaceWith(newCancel);
+                
+                const cleanup = () => modal.classList.remove('show');
+                
+                newSubmit.addEventListener('click', () => { resolve(select.value || null); cleanup(); });
+                newCancel.addEventListener('click', () => { resolve(null); cleanup(); });
             });
         }
 
         document.getElementById('delete-room-btn').addEventListener('click', async () => {
             const inputId = document.getElementById('room-id-input').value.trim();
-            if (!inputId) { alert("削除したい部屋IDを上の入力欄に入力してください"); return; }
-            if (confirm(`部屋ID「${inputId}」のデータをサーバーから完全に削除しますか？`)) {
+            if (!inputId) { alert("削除したい部屋IDを入力してください"); return; }
+            if (confirm(`部屋ID「${inputId}」のデータを完全に削除しますか？`)) {
                 await remove(ref(db, `rooms/${inputId}`));
                 alert(`部屋ID「${inputId}」のデータを削除しました。`);
                 document.getElementById('room-id-input').value = "";
@@ -275,6 +338,11 @@
         });
 
         document.getElementById('join-room-btn').addEventListener('click', async () => {
+            // ▼ 名前と部屋IDのバリデーション
+            const inputName = document.getElementById('user-name-input').value.trim();
+            if (!inputName) { alert("あなたの名前を入力してください"); return; }
+            myName = inputName;
+
             const inputId = document.getElementById('room-id-input').value.trim();
             if (!inputId) { alert("部屋IDを入力してください"); return; }
             
@@ -305,18 +373,18 @@
                     });
                 }
                 
-                await set(myPresenceRef, true);
+                // ▼ 参加者のリストに「自分の名前」を保存する
+                await set(myPresenceRef, myName);
                 onDisconnect(myPresenceRef).remove();
 
             } catch(e) {
-                console.error("Firebaseアクセスエラー:", e);
+                console.error("Firebaseエラー:", e);
                 alert("データベースにアクセスできませんでした。");
                 return;
             }
 
             document.getElementById('lobby-container').style.display = 'none';
             document.getElementById('game-view').style.display = 'flex';
-            document.getElementById('current-room-display').textContent = `部屋ID: ${currentRoomId}`;
 
             onValue(roomRef, (snapshot) => {
                 const data = snapshot.val();
@@ -327,6 +395,17 @@
                     mateText = data.mate || "なし";
                     scapegoatText = data.scapegoat || "なし";
                     addedRules = data.addedRules || [];
+                    
+                    // ▼ 参加者リストの抽出と表示の更新
+                    activeUsers = [];
+                    if (data.users) {
+                        activeUsers = Object.keys(data.users).map(key => ({
+                            id: key,
+                            name: data.users[key]
+                        }));
+                    }
+                    const activeNames = activeUsers.map(u => u.name).join('、');
+                    document.getElementById('current-room-display').innerHTML = `部屋ID: ${currentRoomId}<br>参加者: <span class="active-users-list">${activeNames || '取得中...'}</span>`;
                     
                     document.getElementById('rule10-input').value = customRule10;
                     document.getElementById('deck-stats').textContent = `残りカード: ${deck.length}枚`;
@@ -386,30 +465,39 @@
                 currentCard: card
             });
 
-            // カスタムポップアップ（処理がフリーズしない）
             setTimeout(async () => {
                 let stateChanged = false;
                 let newMate = mateText;
                 let newScapegoat = scapegoatText;
                 let newAddedRules = [...addedRules];
+                
+                // ▼ 自分以外の参加者をプルダウンの選択肢にする
+                const otherUsers = activeUsers.filter(u => u.id !== myUserId);
+                let dropdownOptions = otherUsers.map(u => ({ value: u.name, text: u.name }));
+                // ※万が一のために手入力の選択肢を最後に追加
+                dropdownOptions.push({ value: '__manual__', text: '➕ その他の人 (手入力)' });
 
                 if (card.value === '8') {
-                    const p1 = await askQuestion("👥 Mate (相棒)", "まず、カードを引いた人（あなた）の名前を教えてください");
-                    if (p1) { 
-                        const p2 = await askQuestion("👥 Mate (相棒)", `次に、${p1}さんの「相棒」になる人を指名してください`);
-                        if (p2) {
-                            newMate = `${p1} 🤝 ${p2}`;
-                            stateChanged = true;
-                        }
+                    let p2 = await askSelectQuestion("👥 Mate (相棒)", `あなた（${myName}）の「相棒」を指名してください`, dropdownOptions);
+                    
+                    if (p2 === '__manual__') {
+                        p2 = await askQuestion("👥 Mate (相棒)", "相棒になる人の名前を手入力してください");
+                    }
+                    
+                    if (p2) {
+                        newMate = `${myName} 🤝 ${p2}`;
+                        stateChanged = true;
                     }
                 } else if (card.value === '9') {
-                    const p1 = await askQuestion("🛡 Scapegoat (身代わり)", "まず、カードを引いた人（あなた）の名前を教えてください");
-                    if (p1) { 
-                        const p2 = await askQuestion("🛡 Scapegoat (身代わり)", `次に、${p1}さんの「身代わり」になる人を指名してください`);
-                        if (p2) {
-                            newScapegoat = `${p1} の代わりに ${p2}`;
-                            stateChanged = true;
-                        }
+                    let p2 = await askSelectQuestion("🛡 Scapegoat (身代わり)", `あなた（${myName}）の「身代わり」を指名してください`, dropdownOptions);
+                    
+                    if (p2 === '__manual__') {
+                        p2 = await askQuestion("🛡 Scapegoat (身代わり)", "身代わりになる人の名前を手入力してください");
+                    }
+                    
+                    if (p2) {
+                        newScapegoat = `${myName} の代わりに ${p2}`;
+                        stateChanged = true;
                     }
                 } else if (card.value === 'J') {
                     const input = await askQuestion("📜 Rule (ルール追加)", "追加する新しいルールを入力してください");
